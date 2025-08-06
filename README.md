@@ -58,6 +58,7 @@ This repository includes the parts I personally developed:
 |-----------------------------|--------------------------------------------------|
 | `ts_personal_project.Rmd`   | R code for individual analysis (PVC)            |
 | `ts_personal_project.html`  | Rendered HTML report for personal work          |
+| `ts_group_contribution.Rmd` | R code for VAR section in the group report      |
 | `ts_group_contribution.html`| Rendered HTML for VAR section in group report   |
 | `PVC_data.csv`              | Dataset used in individual analysis             |
 | `G05_print.pdf`             | Full group project report (Vietnamese, PDF)     |
