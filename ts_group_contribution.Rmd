@@ -1,0 +1,141 @@
+---
+title: "Time Series Analysis and Forecasting"
+author: "GiaPhuong"
+date: "2025-04-12"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+library(vars)
+library(Metrics)
+```
+
+#Nhap du lieu log-return giai doan 2023-2024 
+```{r}
+group_logreturn <- read_excel("D:/Tài liệu các môn/Time series/Time Series - TKT64 - 2024-25.xlsx", 
+    sheet = "datanhom")
+group_logreturn<-group_logreturn[,-1]
+head(group_logreturn)
+```
+
+#Xác định bậc của trễ
+```{r}
+VARselect(group_logreturn)
+```
+#Ước lượng mô hình
+```{r}
+var1 <- VAR(group_logreturn, p =1, type = "none")			# package “vars”
+summary(var1)
+```
+#Kiểm định về tự tương quan của phần dư
+```{r}
+serial.test(var1)
+```
+
+#Dự báo VAR(1) (Du bao log_return 10 phien dau 2025)
+```{r}
+forecast1 <- predict(var1,n.ahead=10) 
+logf_VCB<-forecast1$fcst$rVCB[,1]
+logf_CTG<-forecast1$fcst$rCTG[,1]
+logf_PVC<-forecast1$fcst$rPVC[,1]
+logf_PVS<-forecast1$fcst$rPVS[,1]
+logreturnf<-data.frame(logf_VCB,logf_CTG,logf_PVC,logf_PVS)
+logreturnf
+```
+
+##Plot
+```{r}
+par(mfrow = c(1, 1))     
+par(mar = c(4, 4, 2, 2)) 
+plot(forecast1)
+```
+
+#Hàm phản ứng (impulse response function)
+```{r}
+irf(var1)
+```
+
+##Plot 
+```{r}
+plot(irf(var1))
+```
+
+#Phân rã phương sai (forecast error variance decomposition – fevd)
+```{r}
+fevd(var1)
+```
+
+##Plot 
+```{r}
+par(mfrow = c(1, 1))     
+par(mar = c(4, 4, 2, 2))
+plot(fevd(var1))
+```
+#DU BAO GIA CO PHIEU 10 PHIEN DAU 2025
+
+##Nhap du lieu gia co phieu giai doan 2023-2024 
+```{r}
+group_price <- read_excel("D:/Tài liệu các môn/Time series/Time Series - TKT64 - 2024-25.xlsx", 
+    sheet = "Sheet2")
+group_price<-group_price[,-1]
+head(group_price)
+```
+
+#Du bao 4 chuoi gia 10 phien dau 2025
+```{r}
+# Số mã cổ phiếu (cột trong logf105)
+num_stocks <- ncol(logreturnf)
+
+# Tạo một ma trận để lưu giá cho từng cổ phiếu
+price_f <- matrix(0, nrow = nrow(logreturnf), ncol = num_stocks)
+
+# Vòng lặp qua từng cổ phiếu
+for (j in 1:num_stocks) {
+  
+  # Giá phiên đầu tiên cho từng mã cổ phiếu (cột thứ j)
+  price_f1 <- exp(logreturnf[1, j] / 100) * group_price[[499,j]]  # Giá phiên 1 cho cổ phiếu j
+  
+  # Tính giá cho từng phiên tiếp theo
+  price_f[1, j] <- price_f1  # Giá phiên 1
+  for (i in 2:nrow(logreturnf)) {
+    price_f[i, j] <- exp(logreturnf[i, j] / 100) * price_f[i - 1, j]
+  }
+}
+colnames(price_f) <- colnames(group_price)
+# Xem giá của các cổ phiếu sau khi tính toán
+price_f
+```
+```{r}
+#Chuyển đổi matrix thành data frame và gán tên cột
+price_f_df <- as.data.frame(price_f)
+colnames(price_f_df) <- c("VCB", "CTG", "PVC", "PVS")
+View(price_f_df)
+```
+```{r}
+#Gia thuc 10 phien dau 2025
+price_real_2025 <- read_excel("D:/Tài liệu các môn/Time series/Mid_term/GIÁ DỰ BÁO.xlsx", sheet = "Giá thực")
+price_real_2025
+```
+```{r}
+#Tinh RMSE cho tung co phieu 
+rmse_values <- sapply(1:ncol(price_f_df), function(i) {
+  rmse(price_real_2025[[i]], price_f_df[[i]])
+})
+names(rmse_values) <- colnames(price_f_df)
+print(rmse_values)
+```
+```{r}
+#Tinh MAPE cho tung co phieu 
+mape_values <- sapply(1:ncol(price_f_df), function(i) {
+  mape(price_real_2025[[i]], price_f_df[[i]])
+})
+names(mape_values) <- colnames(price_f_df)
+print(mape_values)
+```

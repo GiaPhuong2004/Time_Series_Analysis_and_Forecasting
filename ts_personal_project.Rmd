@@ -1,0 +1,575 @@
+---
+title: 'Time Series Analysis and Forecasting'
+author: "GiaPhuong"
+date: "2025-04-10"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(FinTS)
+library(ggplot2)
+library(tidyverse)
+library(cowplot)
+library(forecast)
+library(ggplot2)
+library(dplyr)
+library(Metrics)
+library(tseries)
+library(urca)
+library(Hmisc)
+library(car)
+library(readxl)
+```
+
+# I. Chuỗi Doanh thu
+
+```{r}
+data1 <- read_excel("D:/Tài liệu các môn/Time series/PVC_data.xlsx", 
+    sheet = "Doanhthu")
+```
+
+## 1. Định dạng số liệu thời gian, tạo biến time và biến mùa vụ
+```{r}
+# Định dạng số liệu thời gian
+doanhthu <- ts(data1$`Doanh số`, start=c(2010,1), frequency = 4)
+```
+```{r}
+# Tạo biến xu thế thời gian
+time <- seq_along(doanhthu)					
+summary(time)
+```
+```{r}
+# Đồ thị 
+dt_plot <- data.frame(Time = time(doanhthu), Revenue = doanhthu)
+dt_plot %>% ggplot(aes(x=Time,y=Revenue)) +
+  geom_line(col="dodgerblue3", size=1.5) +
+  geom_point(col="darkblue") + 
+  theme_minimal() +
+  labs(title="Doanh thu của PVC giai đoạn 2010 - 2024") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))+
+  scale_y_continuous(position="left", limits=c(0,1500))
+```
+## 2. Các mô hình dự báo
+
+### Chia dữ liệu thành training set và validation set
+
+```{r}
+dt_train <- ts(doanhthu[1:56], start=c(2010,1), frequency = 4)
+dt_valid<- ts(doanhthu[57:60], start=c(2024,1), frequency = 4)
+t_train <- seq_along(dt_train)
+summary(t_train)
+```
+
+### MÔ HÌNH 1: linear - linear: 
+$DT_t = \beta_0 + \beta_1 * t + u_t $
+
+```{r}
+reg1 <- lm(dt_train~t_train)
+summary(reg1)
+```
+```{r}
+rmse(dt_train, fitted(reg1))
+mape(dt_train, fitted(reg1))
+```
+
+```{r}
+rmse(dt_valid,predict(reg1, newdata = data.frame(t_train = 57:60))) 
+mape(dt_valid,predict(reg1, newdata = data.frame(t_train = 57:60)))
+```
+### MÔ HÌNH 2: linear - log: 
+$DT_t = \beta_0 + \beta_1*ln(t) + u_t$
+
+```{r}
+reg2 <- lm(dt_train~log(t_train))
+summary(reg2)
+```
+```{r}
+rmse(dt_train, fitted(reg2))
+mape(dt_train, fitted(reg2))
+```
+
+```{r}
+rmse(dt_valid,predict(reg2, newdata = data.frame(t_train = 57:60)))
+mape(dt_valid,predict(reg2, newdata = data.frame(t_train = 57:60)))
+```
+### MÔ HÌNH 3: log - linear: 
+$ln(DT_t) = \beta_0 + \beta_1 * t + u_t $
+
+```{r}
+reg3 <- lm(log(dt_train)~t_train)
+summary(reg3)
+```
+```{r}
+rmse(dt_train, exp(fitted(reg3)))
+mape(dt_train, exp(fitted(reg3)))
+```
+
+```{r}
+rmse(dt_valid,exp(predict(reg3, newdata = data.frame(t_train = 57:60))))
+mape(dt_valid,exp(predict(reg3, newdata = data.frame(t_train = 57:60))))
+```
+### MÔ HÌNH 4: log - log 
+$ln(DT_t) = \beta_0 + \beta_1 * ln(t) +u_t$
+
+```{r}
+reg4 <- lm(log(dt_train)~log(t_train))
+summary(reg4)
+```
+```{r}
+rmse(dt_train, exp(fitted(reg4)))
+mape(dt_train, exp(fitted(reg4)))
+```
+
+```{r}
+rmse(dt_valid,exp(predict(reg4, newdata = data.frame(t_train = 57:60))))
+mape(dt_valid,exp(predict(reg4, newdata = data.frame(t_train = 57:60))))
+```
+
+### Tạo biến giả mùa vụ theo quý
+```{r}
+s1<-rep(c(1,0,0,0),14)
+s2<-rep(c(0,1,0,0),14)
+s3<-rep(c(0,0,1,0),14)
+s4<-rep(c(0,0,0,1),14)
+```
+
+### MÔ HÌNH 5: Hồi quy với biến giả mùa vụ 
+$DT_t = \beta_0 + \beta_1*s_2 + \beta_2*s_3 + \beta_3*s_4 + u_t$ 
+```{r}
+reg5 <- lm(dt_train ~ s2 + s3 + s4)
+summary(reg5)
+```
+```{r}
+rmse(dt_train, fitted(reg5))
+mape(dt_train, fitted(reg5))
+```
+
+```{r}
+rmse(dt_valid,predict(reg5)[1:4])
+mape(dt_valid,predict(reg5)[1:4])
+```
+
+### MÔ HÌNH 6: Xu thế tuyến tính+ Mùa vụ dạng cộng
+$DT_t = \beta_0 + \beta_1*t +\beta_2*s_2 + \beta_3*s_3 + \beta_4*s_4 + u_t$
+```{r}
+reg6 <- lm(dt_train ~ t_train + s2 + s3 + s4)
+summary(reg6)
+```
+```{r}
+rmse(dt_train, fitted(reg6))
+mape(dt_train, fitted(reg6))
+```
+
+```{r}
+rmse(dt_valid, predict(reg6, newdata = data.frame(t_train = 57:60,
+                                                  s2=c(0,1,0,0),
+                                                  s3=c(0,0,1,0),
+                                                  s4=c(0,0,0,1))))
+
+mape(dt_valid,  predict(reg6, newdata = data.frame(t_train = 57:60,
+                                                  s2=c(0,1,0,0),
+                                                  s3=c(0,0,1,0),
+                                                  s4=c(0,0,0,1))))
+```
+### MÔ HÌNH 7: Xu thế tuyến tính + Mùa vụ, dạng nhân
+$DT_t = \beta_0 + \beta_1*t +\beta_2*t*s_2 + \beta_3*t*s_3 + \beta_4*t*s_4 + u_t$
+
+```{r}
+reg7 <- lm(dt_train ~ t_train + I(t_train*s2) + I(t_train*s3)+ I(t_train*s4))
+summary(reg7)
+```
+```{r}
+rmse(dt_train, fitted(reg7))
+mape(dt_train, fitted(reg7))
+```
+
+```{r}
+rmse(dt_valid, predict(reg7, newdata = data.frame(t_train = 57:60,
+                                                  s2=c(0,1,0,0),
+                                                  s3=c(0,0,1,0),
+                                                  s4=c(0,0,0,1))))
+mape(dt_valid, predict(reg7, newdata = data.frame(t_train = 57:60,
+                                                  s2=c(0,1,0,0),
+                                                  s3=c(0,0,1,0),
+                                                  s4=c(0,0,0,1))))
+```
+### MÔ HÌNH 8: Holt - Winter có mùa vụ dạng cộng
+```{r}
+hw.dt.train.a <- HoltWinters(dt_train, seasonal = "a")
+hw.dt.train.a 
+```
+```{r}
+rmse(dt_train, fitted(hw.dt.train.a)[,1])
+mape(dt_train, fitted(hw.dt.train.a)[,1])
+```
+
+```{r}
+rmse(dt_valid, forecast(hw.dt.train.a,h=4)$mean)
+mape(dt_valid, forecast(hw.dt.train.a,h=4)$mean)
+```
+### MÔ HÌNH 9: Holt - Winter có mùa vụ dạng nhân
+
+```{r}
+hw.dt.train.m <- HoltWinters(dt_train, seasonal = "m")  
+hw.dt.train.m
+```
+```{r}
+rmse(dt_train, fitted(hw.dt.train.m)[,1])
+mape(dt_train, fitted(hw.dt.train.m)[,1])
+```
+
+```{r}
+rmse(dt_valid, forecast(hw.dt.train.m,h=4)$mean)
+mape(dt_valid, forecast(hw.dt.train.m,h=4)$mean)
+```
+#Chọn MÔ HÌNH 7: Xu thế tuyến tính + Mùa vụ, dạng nhân để dự báo cho 2025 
+```{r}
+#Mô hình Xu thế tuyến tính + Mùa vụ, dạng nhân trên toàn dữ liệu 2010-2024
+reg7_1 <- lm(doanhthu ~ time + I(time*s2) + I(time*s3)+ I(time*s4))
+summary(reg7_1)
+```
+```{r}
+#Dự báo cho 4 quý năm 2025
+predict(reg7_1, newdata = data.frame(time = 61:64,
+                                    s2=c(0,1,0,0),
+                                    s3=c(0,0,1,0),
+                                    s4=c(0,0,0,1)))
+```
+# II. Chuỗi giá và log return của PVC
+```{r}
+data2 <- read_excel("D:/Tài liệu các môn/Time series/PVC_data.xlsx", 
+    sheet = "Price")
+names(data2)=c("Date","Price","LogReturn")
+attach(data2)
+```
+
+## 1. Định dạng số liệu thời gian
+```{r}
+price <- ts(Price, start=1, frequency=1)
+logreturn <- ts(LogReturn, start=1, frequency=1)
+```
+
+## 2. Plot
+```{r}
+plot1 <- data2 %>% ggplot(aes(x=Date,y=ts(Price))) +
+  geom_line(color="blue1", size=1.2) +
+  geom_smooth(linetype="dashed", color="#1E90FF")+
+  labs(x="Date", y="Price") +
+  labs(title="Chuỗi giá đóng cửa của PVC")+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))+
+  scale_y_continuous(position="left", limits=c(1000,20000)) 
+plot1
+```
+```{r}
+plot2 <- data2 %>% ggplot(aes(x=Date, y=ts(LogReturn))) +
+  geom_line(color="indianred2", size = 0.8) +
+  scale_y_continuous(position="left", limits=c(-20,20)) +
+  labs(x="Date", y="Log return")+
+  labs(title="Chuỗi lợi suất của PVC")+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+plot2
+```
+## 3. Kiểm định ADF
+###Price
+```{r}
+summary(ur.df(price,type = "trend", selectlags = "AIC"))
+```
+```{r}
+summary(ur.df(price,type = "drift", selectlags = "AIC"))
+```
+Chuỗi price không dừng 
+
+###Log return 
+```{r}
+summary(ur.df(logreturn[2:499], type="trend"))
+```
+
+```{r}
+summary(ur.df(logreturn[2:499], type="drift"))
+```
+```{r}
+summary(ur.df(logreturn[2:499], type="none"))
+```
+Chuỗi logreturn dừng vây quanh 0
+
+###Sai phân của Price
+```{r}
+summary(ur.df(diff(price),type = "trend"))
+```
+```{r}
+summary(ur.df(diff(price),type = "drift"))
+```
+```{r}
+summary(ur.df(diff(price),type = "none"))
+```
+Sai phân của Price dừng vây quanh 0
+
+##4. Xem ACF, PACF của chuỗi Log return
+
+```{r}
+acf(logreturn[2:499])
+pacf(logreturn[2:499])
+```
+Đề xuất mô hình: ARIMA(1,0,5), ARIMA(5,0,1)
+
+### 4.1. Mô hình ARIMA
+```{r}
+# ARIMA(1,0,5)
+reg.log.arima105 <- arima(logreturn[2:499], order = c(1,0,5),include.mean=FALSE)
+summary(reg.log.arima105)
+```
+```{r}
+# ARIMA(5,0,1)
+reg.log.arima501 <- arima(logreturn[2:499], order = c(5,0,1),include.mean=FALSE)
+summary(reg.log.arima501)
+```
+### 4.2 Xem tính dừng qua nghiệm nghịch đảo
+```{r}
+autoplot(reg.log.arima105)
+```
+```{r}
+autoplot(reg.log.arima501)
+```
+### 4.3 Kiểm định tính nhiễu trắng của phần dư
+```{r}
+checkresiduals(reg.log.arima105)
+```
+
+```{r}
+checkresiduals(reg.log.arima501)
+```
+### 4.4 Dự báo logreturn
+
+```{r}
+logf.arima501<-forecast(reg.log.arima501,h=10)
+logf.arima501
+```
+
+#### Tính sai số 
+```{r}
+data3 <- read_excel("D:/Tài liệu các môn/Time series/PVC_data.xlsx", 
+    sheet = "Real_Price")
+names(data3)=c("Date","real_Price","real_LogReturn")
+attach(data3)
+```
+
+```{r}
+real_log <- ts(data3$real_LogReturn, start=500, end=509, frequency=1)
+```
+
+
+```{r}
+# ARIMA(5,0,1)
+rmse(real_log, logf.arima501$mean)
+mape(real_log, logf.arima501$mean)
+```
+### 6.5. Suy ra dự báo giá cổ phiếu 10 phiên đầu năm 2025
+```{r}
+logf501 <- data.frame(logf.arima501$mean)
+```
+
+
+```{r}
+real_price <- ts(data3$real_Price, start=1, end=10, frequency=1)
+```
+
+
+```{r}
+# ARIMA(5,0,1)
+price_f1 <- exp(logf501[1,1]/100)*price[499]  # Giá phiên 1 
+
+k <- nrow(logf501)
+price_f <- rep(0,k)
+# Tạo vòng lặp để tính giá 
+for(i in 2:k){
+  price_f[1] <- price_f1
+ price_f[i] <- exp(logf501[i,1]/100)*price_f[i-1]
+}
+price_f    # Giá 10 phiên 
+```
+```{r}
+# sai số ARIMA(5,0,1)
+rmse(real_price, price_f)
+mape(real_price, price_f)
+```
+## 5. Xem ACF, PACF của sai phân price
+
+```{r}
+acf(diff(price))
+pacf(diff(price))
+```
+Đề xuất mô hình: ARIMA(1,1,5), ARIMA(5,1,1)
+
+### 5.1. Mô hình ARIMA
+```{r}
+# ARIMA(1,1,5)
+reg.price.arima115 <- arima(price, order = c(1,1,5))
+summary(reg.price.arima115)
+```
+```{r}
+# ARIMA(5,1,1)
+reg.price.arima511 <- arima(price, order = c(5,1,1))
+summary(reg.price.arima511)
+```
+### 5.2 Xem tính dừng qua nghiệm nghịch đảo
+```{r}
+autoplot(reg.price.arima115)
+```
+```{r}
+autoplot(reg.price.arima511)
+```
+
+### 5.3 Kiểm định tính nhiễu trắng của phần dư
+
+```{r}
+checkresiduals(reg.price.arima115)
+```
+
+```{r}
+checkresiduals(reg.price.arima511)
+```
+
+### 5.4 Dự báo giá 
+
+
+```{r}
+pricef.arima511 <- forecast(reg.price.arima511,h=10)
+pricef.arima511
+```
+
+#### Tính sai số 
+```{r}
+real_close <- ts(data3$real_Price, start=500, end=509, frequency=1)
+```
+
+```{r}
+# ARIMA(5,1,1)
+rmse(real_close, pricef.arima511$mean)
+mape(real_close, pricef.arima511$mean)
+```
+#Plot 
+```{r}
+#ARIMA (5,1,1)
+# Bước 1: Chuẩn bị dữ liệu 
+## Ghép chuỗi giá thực lại thành 1 vector
+all_Price <- c(price, real_close)
+##Tính toán giá fitted và forecast
+fitted<-fitted(reg.price.arima511)
+forecast<-pricef.arima511$mean
+
+# Bước 2: vẽ giá thực
+plot(1:509, all_Price, type = "l", col = "red", lwd = 3,lty=1,
+     xlab = "Thời gian", ylab = "Giá", main = "Giá thực, fitted, và dự đoán")
+
+# Bước 3: thêm fitted (đường xanh)
+lines(1:499, fitted, type = "l", col = "blue", lwd = 2, lty = 1)
+
+# Bước 4: thêm forecast (đường đen)
+lines(500:509, forecast, type = "l", col = "black", lwd = 2, lty = 1)
+
+# Bước 5: thêm chú thích
+legend("topleft",
+       legend = c("Giá thực", "Fitted", "Forecast"),
+       col = c("red", "blue", "black"),
+       lty = c(1, 1, 1),
+       lwd = c(3,2,2))
+```
+
+## 6. Mô hình ARCH - GARCH
+
+```{r}
+# Kiểm tra sự thay đổi phương sai
+library(fUnitRoots)
+ArchTest(logreturn[2:499])
+```
+```{r}
+# Xây dựng mô hình GARCH
+library(rugarch)
+garch_spec <- ugarchspec(
+  mean.model = list(armaOrder = c(5, 1)), 
+  variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), 
+  distribution.model = "norm"
+)
+```
+
+
+```{r}
+garch_fit <- ugarchfit(spec = garch_spec, data = logreturn[2:499])
+summary(garch_fit)
+```
+```{r}
+coef(garch_fit)  # Trích xuất các tham số của mô hình
+```
+```{r}
+# Dự báo 10 bước tới
+forecast_result <- ugarchforecast(garch_fit, n.ahead = 10)
+
+# Hiển thị kết quả dự báo
+forecast_result
+```
+```{r}
+garch_logf <- forecast_result@forecast$seriesFor
+garch_logf 
+```
+```{r}
+rmse(real_log,garch_logf)
+```
+```{r}
+mape(real_log,garch_logf)
+```
+```{r}
+#Tinh gia
+price_f1 <- exp(garch_logf[1,1]/100)*price[499]  # Giá phiên 1 
+
+k <- nrow(garch_logf)
+price_f <- rep(0,k)
+# Tạo vòng lặp để tính giá 
+for(i in 2:k){
+  price_f[1] <- price_f1
+ price_f[i] <- exp(garch_logf[i,1]/100)*price_f[i-1]
+}
+price_f  
+```
+```{r}
+rmse(real_close,price_f)
+mape(real_close,price_f)
+```
+
+#Du bao rui ro 
+```{r}
+forecast_result@forecast$sigmaFor
+```
+```{r}
+P0 <- price[499]  # giá cuối cùng thực tế
+
+# Lấy forecast volatility (%)
+sigma <- as.numeric(forecast_result@forecast$sigmaFor)
+
+# Chuyển về đơn vị chuẩn (không phải %)
+sigma <- sigma / 100
+
+# Tính phương sai giá
+price_var <- (P0^2) * sigma^2
+
+# Tính độ lệch chuẩn giá
+price_sd <- P0 * sigma
+
+# Tạo bảng kết quả
+forecast_df <- data.frame(
+  Step = paste0("T+", 1:10),
+  Sigma = round(sigma, 4),
+  PriceVariance = round(price_var, 4),
+  PriceSD = round(price_sd, 4)
+)
+
+forecast_df
+
+
+```
+
