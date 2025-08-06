@@ -37,8 +37,8 @@ This repository includes the parts I personally developed:
 
 - Analyzed PVC (PetroVietnam Chemical and Services Corporation)
 - Forecasted:
-  - Quarterly revenue for 2025 using ARIMA
-  - Stock prices for the first 10 trading days of 2025
+  - Quarterly revenue for 2025 using the multiplicative trend and seasonal model
+  - Stock prices for the first 10 trading days of 2025 using ARIMA
   - Volatility using GARCH
 - Conducted stationarity tests and model diagnostics
 
