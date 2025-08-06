@@ -9,7 +9,7 @@ This project focuses on analyzing and forecasting financial time series from the
 Each team member selected a company to analyze. The analysis included:
 
 - Forecasting quarterly revenue and short-term stock prices.
-- Testing stationarity using ADF and KPSS.
+- Testing stationarity using ADF.
 - Applying ARIMA models and comparing alternatives.
 - Estimating volatility using GARCH models.
 
@@ -26,7 +26,6 @@ Individual results were combined to construct and evaluate an investment portfol
 - Inter-series relationship modeling using:
   - Cointegration tests
   - VAR (Vector Autoregression) models
-  - Impulse response functions and variance decomposition
 
 ---
 
